@@ -1,0 +1,16 @@
+{
+  "name": "noetic desktop",
+  "dockerFile": "Dockerfile",
+  "runArgs": [
+    "--privileged",
+    "--network=host"
+  ],
+  "workspaceMount": "source=${localWorkspaceFolder},target=/${localWorkspaceFolderBasename},type=bind",
+  "workspaceFolder": "/${localWorkspaceFolderBasename}",
+  // "workspaceFolder": "/workspace",
+
+  "mounts": [
+    "source=${localEnv:HOME}${localEnv:USERPROFILE}/.bash_history,target=/home/vscode/.bash_history,type=bind"
+  ]
+  // "mounts": [ "source=${localEnv:HOME},target=${localEnv:HOME},type=bind,consistency=cached" ]
+}

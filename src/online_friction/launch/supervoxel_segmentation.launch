@@ -1,0 +1,79 @@
+<launch>
+<!-- 
+	<arg name="file_name" value="$(find jsk_pcl_ros_samples)/pcd/bunny_rgb.pcd"/>
+
+	<arg name="rate" value="0.1"/>
+	<node pkg="pcl_ros" type="pcd_to_pointcloud" name="pcd_to_pointcloud" args="$(arg file_name) $(arg rate)" output="screen">
+		<remap from="cloud_pcd" to="/points"/>
+		<param name="frame_id" value="base_link" />
+	</node> -->
+  <!-- <param name="/use_sim_time" value="true"/>  Doesnt work if enable -->
+  <!-- Transform pc to a target frame - https://github.com/jsk-ros-pkg/jsk_recognition/blob/master/doc/jsk_pcl_ros_utils/nodes/tf_transform_cloud.md -->
+  <node name="tf_transform_cloud"
+          pkg="nodelet" type="nodelet"
+          args="standalone jsk_pcl_utils/TfTransformCloud">
+      <remap from="~input" to="/camera/depth_registered/points"/>
+      <remap from="~output" to="/transformed_points"/>
+
+      <rosparam>
+        target_frame_id: panda_link0 
+        <!-- aruco_marker_frame_filtered -->
+      </rosparam>
+  </node>
+
+  <node pkg="nodelet" type="nodelet" name="pcl_manager" args="manager" output="screen" />
+  <!-- Run a passthrough filter to clean NaNs https://wiki.ros.org/pcl_ros/Tutorials/filters -->
+  <node pkg="nodelet" type="nodelet" name="cropbox" args="load pcl/CropBox pcl_manager" output="screen">
+    <remap from="~input" to="/transformed_points" />
+    <remap from="~output" to="/filtered_points" />
+    <rosparam>
+      min_x: 0.2
+      max_x: 0.6
+      min_y: -0.2
+      max_y: 0.2
+      min_z: 0.04
+      max_z: 0.2
+      negative: False
+    </rosparam>
+    <!-- Below are the filtered value for target_frame_id: aruco_marker_frame_filtered -->
+    <!-- <rosparam>
+    min_x: -0.2
+    max_x: 0.2
+    min_y: -0.2
+    max_y: 0.2
+    min_z: 0.05
+    max_z: 0.3
+    negative: False
+  </rosparam> -->
+  </node>
+
+  <arg name="gui" default="true"/>
+
+  <node name="sample_manager"
+        pkg="nodelet" type="nodelet"
+        args="manager"/>
+
+  <node name="supervoxel_segmentation"
+        pkg="nodelet" type="nodelet"
+        args="load jsk_pcl/SupervoxelSegmentation sample_manager">
+    <remap from="~input" to="/filtered_points"/>
+    <rosparam>
+      seed_resolution: 0.1
+      <!-- color_importance: 1.0 -->
+    </rosparam>
+  </node>
+
+  <node name="cluster_point_indices_decomposer"
+        pkg="nodelet" type="nodelet"
+        args="load jsk_pcl/ClusterPointIndicesDecomposer sample_manager">
+    <remap from="~input" to="supervoxel_segmentation/output/cloud"/>
+    <remap from="~target" to="supervoxel_segmentation/output/indices"/>
+  </node>
+
+  <group if="$(arg gui)">
+    <node name="rviz"
+          pkg="rviz" type="rviz"
+          args="-d $(find online_friction)/rviz/supervoxel_segmentation.rviz"/>
+    <!-- <node name="rqt_reconfigure" pkg="rqt_reconfigure" type="rqt_reconfigure"/> -->
+  </group>
+</launch>
